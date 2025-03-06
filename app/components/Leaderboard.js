@@ -8,30 +8,37 @@ export default function Leaderboard() {
   const [error, setError] = useState(null);
   const [timeLeft, setTimeLeft] = useState(getTimeUntilSunday());
 
+  // ✅ Fetch leaderboard data from API
   useEffect(() => {
-    fetch("https://api.goated.com/user/affiliate/referral-leaderboard/OQID5MA")
-      .then((response) => {
+    const fetchLeaderboard = async () => {
+      try {
+        const response = await fetch("https://api.goated.com/user/affiliate/referral-leaderboard/OQID5MA");
+        
         if (!response.ok) {
           throw new Error(`HTTP error! Status: ${response.status}`);
         }
-        return response.json();
-      })
-      .then((data) => {
+
+        const data = await response.json();
         console.log("Full API Response:", data);
+
         const sortedData = data.data
-          .filter((player) => player.wagered.this_month > 0)
+          .filter((player) => player.wagered?.this_month > 0)  // ✅ Ensure wagered data exists
           .sort((a, b) => b.wagered.this_month - a.wagered.this_month)
-          .slice(0, 7);  // ✅ Top 7 players only
+          .slice(0, 7);  // ✅ Show top 7 players only
 
         setLeaderboard(sortedData);
-      })
-      .catch((error) => {
+      } catch (error) {
         console.error("Error fetching leaderboard:", error);
-        setError("Failed to load leaderboard. Please try again.");
-      })
-      .finally(() => setLoading(false));
+        setError(`Failed to load leaderboard: ${error.message}`);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchLeaderboard();
   }, []);
 
+  // ✅ Countdown Timer for Next Payout (Sunday 23:59 UTC)
   useEffect(() => {
     const timer = setInterval(() => {
       setTimeLeft(getTimeUntilSunday());
@@ -44,7 +51,7 @@ export default function Leaderboard() {
     const now = new Date();
     const dayOfWeek = now.getUTCDay();
     const daysUntilSunday = dayOfWeek === 0 ? 0 : 7 - dayOfWeek;
-    
+
     const nextSunday = new Date(Date.UTC(
       now.getUTCFullYear(),
       now.getUTCMonth(),
@@ -61,11 +68,12 @@ export default function Leaderboard() {
     return { days, hours, minutes, seconds };
   }
 
+  // ✅ Prize Distribution
   const prizes = ["$100", "$80", "$60", "$50", "$40", "$30", "$20"];
 
   return (
     <div className="max-w-7xl mx-auto p-8 sm:p-16 bg-black text-white rounded-lg shadow-lg text-center">
-
+      
       {/* 🏆 Johnny Knox Weekly Prize Section */}
       <div className="mb-6">
         <h2 className="text-6xl sm:text-8xl font-extrabold text-[#FFD700] leading-tight">
