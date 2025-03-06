@@ -13,19 +13,19 @@ export default function Leaderboard() {
     const fetchLeaderboard = async () => {
       try {
         const response = await fetch("https://api.goated.com/user/affiliate/referral-leaderboard/OQID5MA");
-        
+    
         if (!response.ok) {
-          throw new Error(`HTTP error! Status: ${response.status}`);
+          throw new Error(`HTTP error! Status: ${response.status} - ${response.statusText}`);
         }
-
+    
         const data = await response.json();
         console.log("Full API Response:", data);
-
+    
         const sortedData = data.data
           .filter((player) => player.wagered?.this_month > 0)  // ✅ Ensure wagered data exists
           .sort((a, b) => b.wagered.this_month - a.wagered.this_month)
-          .slice(0, 7);  // ✅ Show top 7 players only
-
+          .slice(0, 7);
+    
         setLeaderboard(sortedData);
       } catch (error) {
         console.error("Error fetching leaderboard:", error);
@@ -34,6 +34,7 @@ export default function Leaderboard() {
         setLoading(false);
       }
     };
+    
 
     fetchLeaderboard();
   }, []);
