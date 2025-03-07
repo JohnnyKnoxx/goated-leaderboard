@@ -1,4 +1,4 @@
-import Leaderboard from "../components/Leaderboard";  // ✅ Correct relative path
+import Leaderboard from "../components/Leaderboard";  // ✅ Correct path
 
 export default function LeaderboardPage() {
   return (
