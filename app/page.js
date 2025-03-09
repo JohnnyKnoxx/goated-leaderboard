@@ -1,101 +1,197 @@
-import Image from "next/image";
+"use client";
+import React, { useEffect, useState } from "react";
 
-export default function Home() {
+/**
+ * Hook to calculate the countdown until the next Sunday at 23:59 UTC.
+ */
+function useCountdownToSunday() {
+  const [timeLeft, setTimeLeft] = useState("");
+
+  useEffect(() => {
+    function getNextSunday23_59UTC() {
+      const now = new Date();
+      const dayOfWeek = now.getUTCDay(); // 0 = Sunday
+      let daysUntilSunday = (7 - dayOfWeek) % 7;
+      // If it's already Sunday, we want the NEXT Sunday (7 days away)
+      if (daysUntilSunday === 0) {
+        daysUntilSunday = 7;
+      }
+      return new Date(
+        Date.UTC(
+          now.getUTCFullYear(),
+          now.getUTCMonth(),
+          now.getUTCDate() + daysUntilSunday,
+          23,
+          59,
+          0
+        )
+      );
+    }
+
+    function updateCountdown() {
+      const now = new Date().getTime();
+      const end = getNextSunday23_59UTC().getTime();
+      const distance = end - now;
+
+      if (distance <= 0) {
+        setTimeLeft("0h 0m 0s");
+        return;
+      }
+
+      const days = Math.floor(distance / (1000 * 60 * 60 * 24));
+      const hours = Math.floor((distance / (1000 * 60 * 60)) % 24);
+      const minutes = Math.floor((distance / (1000 * 60)) % 60);
+      const seconds = Math.floor((distance / 1000) % 60);
+
+      let display = "";
+      if (days > 0) display += `${days}d `;
+      display += `${hours}h ${minutes}m ${seconds}s`;
+      setTimeLeft(display);
+    }
+
+    // Start immediately, then update every second.
+    updateCountdown();
+    const intervalId = setInterval(updateCountdown, 1000);
+    return () => clearInterval(intervalId);
+  }, []);
+
+  return timeLeft;
+}
+
+/**
+ * Masks a username by keeping the first 3 and last 2 characters.
+ * Example: "NotNike" becomes "NOT***KE".
+ */
+function maskName(name) {
+  if (!name) return "";
+  if (name.length <= 5) return name;
+  const first3 = name.slice(0, 3).toUpperCase();
+  const last2 = name.slice(-2).toUpperCase();
+  return `${first3}***${last2}`;
+}
+
+/**
+ * Returns a static prize for the top 7 ranks:
+ * 1st → $100, 2nd → $90, 3rd → $60, 4th → $50,
+ * 5th → $40, 6th → $20, 7th → $10, else → $0.
+ */
+function getPrize(rankIndex) {
+  switch (rankIndex) {
+    case 0:
+      return 100;
+    case 1:
+      return 90;
+    case 2:
+      return 60;
+    case 3:
+      return 50;
+    case 4:
+      return 40;
+    case 5:
+      return 20;
+    case 6:
+      return 10;
+    default:
+      return 0;
+  }
+}
+
+export default function LeaderboardPage() {
+  const [players, setPlayers] = useState([]);
+  const [error, setError] = useState(null);
+
+  // Get the live countdown text.
+  const timeLeft = useCountdownToSunday();
+
+  // Fetch leaderboard data from the local proxy route.
+  // (Make sure you have created an API route at app/api/leaderboard/route.js
+  // that proxies "https://api.goated.com/user/affiliate/referral-leaderboard/OQID5MA".)
+  useEffect(() => {
+    fetch("/api/leaderboard")
+      .then((res) => {
+        if (!res.ok) {
+          throw new Error(`HTTP error! status: ${res.status}`);
+        }
+        return res.json();
+      })
+      .then((data) => {
+        // The API returns an object with { success, data: [...] }
+        const fetchedPlayers = data?.data || [];
+        // Sort players by weekly wager descending.
+        const sorted = fetchedPlayers.sort(
+          (a, b) => (b.wagered.this_week || 0) - (a.wagered.this_week || 0)
+        );
+        // Only keep the top 7 players.
+        const top7 = sorted.slice(0, 7);
+        setPlayers(top7);
+      })
+      .catch((err) => {
+        console.error("Error fetching leaderboard data:", err);
+        setError("Failed to load leaderboard. Please try again later.");
+      });
+  }, []);
+
+  // If there's an error, display an error message.
+  if (error) {
+    return (
+      <div className="min-h-screen bg-black text-white flex flex-col items-center py-10 px-4">
+        <h1 className="text-yellow-400 text-4xl font-extrabold mb-2">
+          Johnny Knox
+        </h1>
+        <h2 className="text-yellow-400 text-2xl font-bold mb-1">$400 Weekly</h2>
+        <h3 className="text-xl font-semibold mb-2">Goated Leaderboard</h3>
+        <p className="text-lg font-semibold mb-6 text-red-400">{error}</p>
+      </div>
+    );
+  }
+
+  // Render the leaderboard.
   return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              app/page.js
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+    <div className="min-h-screen bg-black text-white flex flex-col items-center py-10 px-4">
+      {/* Header Section */}
+      <h1 className="text-yellow-400 text-4xl font-extrabold mb-2">Johnny Knox</h1>
+      <h2 className="text-yellow-400 text-2xl font-bold mb-1">$400 Weekly</h2>
+      <h3 className="text-xl font-semibold mb-2">Goated Leaderboard</h3>
+      <p className="text-lg font-semibold mb-6">
+        Next Payout In: <span className="text-yellow-400">{timeLeft}</span>
+      </p>
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
-        </div>
-      </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+      {/* Leaderboard Table */}
+      <div className="w-full max-w-3xl">
+        <table className="w-full table-auto border-collapse">
+          <thead>
+            <tr className="border-b border-gray-700 text-yellow-400">
+              <th className="px-4 py-2 text-left">PLACE</th>
+              <th className="px-4 py-2 text-left">USER</th>
+              <th className="px-4 py-2 text-left">WAGER</th>
+              <th className="px-4 py-2 text-left">PRIZE</th>
+            </tr>
+          </thead>
+          <tbody>
+            {players.map((player, index) => {
+              const place = index + 1;
+              const maskedUsername = maskName(player.name);
+              const weeklyWager = player.wagered?.this_week || 0;
+              const prize = getPrize(index); // Static prize based on rank
+
+              return (
+                <tr key={player.uid || index} className="border-b border-gray-800">
+                  <td className="px-4 py-2">{place}.</td>
+                  <td className="px-4 py-2">{maskedUsername}</td>
+                  <td className="px-4 py-2">
+                    $
+                    {weeklyWager.toLocaleString(undefined, {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
+                  </td>
+                  <td className="px-4 py-2">${prize}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
